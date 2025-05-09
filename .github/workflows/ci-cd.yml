@@ -1,118 +1,62 @@
-name: CI/CD Pipeline
+name: Node.js Testing CI/CD
 
-# Triggers for the workflow
-# This workflow will run on pushes to main/master branch and on pull requests to main/master
 on:
   push:
-    branches: [ main, master ]  # Triggers on push to main or master branch
+    branches: [ main, master ]
   pull_request:
-    branches: [ main, master ]  # Triggers on pull requests to main or master branch
+    branches: [ main, master ]
 
 jobs:
-  # Define a single job that will handle build, test, and deployment
-  build-and-test:
-    name: Build, Test, and Deploy
-    runs-on: ubuntu-latest  # Use the latest Ubuntu runner
-    
-    # Define a matrix strategy to potentially test with multiple Node.js versions
-    strategy:
-      matrix:
-        node-version: [16.x]  # You can add more Node.js versions (e.g., 18.x, 20.x) if needed
-    
+  test:
+    runs-on: ubuntu-latest
+
     steps:
-      # Checkout the repository
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      # Set up Node.js environment
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
-      
-      # Cache node modules to speed up builds
-      - name: Cache Node.js modules
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-      
-      # Install dependencies
-      - name: Install dependencies
-        run: npm ci
-      
-      # Run tests
-      - name: Run tests
-        run: npm test
-      
-      # Run code coverage
-      - name: Generate coverage report
-        run: npm run cover
-      
-      # Upload test coverage as an artifact
-      - name: Upload test coverage
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage-report
-          path: ./reports/coverage
-      
-      # Build the application
-      - name: Build
-        run: |
-          mkdir -p build
-          cp -r *.js package.json package-lock.json build/
-          cp -r test-data build/
-          cp -r test build/
-          ls -la build/
-      
-      # Upload build artifacts
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: node-app
-          path: ./build
-      
-      # Deploy to GitHub Pages (mock)
-      - name: Deploy to GitHub Pages
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-        run: |
-          echo "Deploying to GitHub Pages..."
-          # This is a mock step. For real deployment, you would use actions/gh-pages
-          # - name: Deploy to GitHub Pages
-          #   uses: JamesIves/github-pages-deploy-action@v4
-          #   with:
-          #     folder: build
-          
-      # Add status badge (automated through README.md)
-      - name: Status Badge
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-        run: |
-          echo "Status badge URL: https://github.com/${GITHUB_REPOSITORY}/actions/workflows/ci-cd.yml/badge.svg"
-      
-      # Notify on success/failure
-      - name: Notify on success
-        if: success()
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_CHANNEL: ci-cd-notifications
-          SLACK_COLOR: good
-          SLACK_ICON: https://github.com/rtCamp.png?size=48
-          SLACK_MESSAGE: 'Build, test and deployment succeeded! :rocket:'
-          SLACK_TITLE: Success
-          SLACK_USERNAME: GitHub Actions
-      
-      - name: Notify on failure
-        if: failure()
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_CHANNEL: ci-cd-notifications
-          SLACK_COLOR: danger
-          SLACK_ICON: https://github.com/rtCamp.png?size=48
-          SLACK_MESSAGE: 'Build, test or deployment failed! :x:'
-          SLACK_TITLE: Failure
-          SLACK_USERNAME: GitHub Actions
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v1
+      with:
+        node-version: '14.x'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Run Mocha tests
+      run: npm test
+
+    - name: Run Istanbul coverage tests
+      run: npm run cover
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v1
+      with:
+        node-version: '14.x'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Create build directory
+      run: |
+        mkdir -p dist
+        cp -r *.js package.json package-lock.json dist/
+        cp -r test test-data dist/ || true
+
+    - name: Mock deployment to GitHub Pages
+      run: |
+        echo "Weather app would be deployed here in a real scenario"
+        echo "Build complete and ready for deployment!"
+
+    - name: Add GitHub Actions status badge to README
+      run: |
+        echo "To add a GitHub Actions status badge to your README, use:"
+        echo "![GitHub Actions CI/CD](https://github.com/${{ github.repository }}/workflows/Node.js%20Testing%20CI/CD/badge.svg)"
