@@ -1,0 +1,103 @@
+name: Weather App CI/CD Pipeline
+
+# Workflow triggers on both push to main branch and pull requests to main branch
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  # Single job handling test, build, and deploy processes
+  weather-app-pipeline:
+    name: Test, Build, and Deploy Weather App
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Check out the repository code
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      
+      # Step 2: Set up Node.js environment
+      - name: Set up Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: '14.x'
+      
+      # Step 3: Cache NPM dependencies for faster builds
+      - name: Cache dependencies
+        uses: actions/cache@v1
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      
+      # Step 4: Install the project dependencies
+      - name: Install dependencies
+        run: npm install
+      
+      # Step 5: Run Mocha tests
+      - name: Run Mocha tests
+        run: npm test
+      
+      # Step 6: Generate Istanbul coverage reports
+      - name: Generate Istanbul coverage report
+        run: npm run cover
+      
+      # Step 7: Save test coverage reports as artifacts
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v1
+        with:
+          name: coverage-reports
+          path: ./reports/coverage
+      
+      # Step 8: Build the weather application for deployment
+      - name: Create build artifacts
+        run: |
+          # Create a distribution directory
+          mkdir -p dist
+          
+          # Copy application files
+          cp app.js dist/
+          cp -r lib dist/ || true
+          cp -r data dist/ || true
+          cp -r test-data dist/ || true
+          
+          # Copy package files for dependencies
+          cp package.json package-lock.json dist/ || true
+          
+          # Create a metadata file with build info
+          echo "Build created on $(date)" > dist/build-info.txt
+          echo "Repository: $GITHUB_REPOSITORY" >> dist/build-info.txt
+          echo "Commit: $GITHUB_SHA" >> dist/build-info.txt
+          
+          # List the build contents
+          echo "Weather App build artifacts created:"
+          ls -la dist/
+      
+      # Step 9: Save build artifacts
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          name: weather-app-build
+          path: ./dist
+      
+      # Step 10: Mock deployment (only on push to main/master)
+      - name: Deploy to GitHub Pages (Mock)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          echo "===== DEPLOYMENT STEP ====="
+          echo "Weather App would be deployed to GitHub Pages in a real scenario"
+          echo "The build artifacts are available in GitHub Actions artifacts"
+          echo "For real deployment, the dist directory would be published to GitHub Pages"
+          echo "Deployment simulation successful ✅"
+
+      # Step 11: Add GitHub Actions badge information
+      - name: GitHub Actions Badge
+        run: |
+          echo "===== STATUS BADGE ====="
+          echo "Add this badge to your README.md:"
+          echo "![Weather App CI/CD](https://github.com/${{ github.repository }}/actions/workflows/ci-cd.yml/badge.svg)"
+          echo ""
+          echo "This will complement your existing Travis CI, Snyk, Inch CI, and Codacy badges"
